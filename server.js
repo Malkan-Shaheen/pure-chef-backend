@@ -58,6 +58,25 @@ if (!process.env.JWT_SECRET) {
 // ─────────────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────────────
-app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 PureChef Kitchen is open and listening on port ${port}`);
+});
+
+// Graceful shutdown (Railway sends SIGTERM on restart)
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+        mongoose.connection.close(false, () => {
+            console.log('Closed.');
+            process.exit(0);
+        });
+    });
+});
+
+// Prevent crashes from uncaught errors
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, p) => {
+    console.error('Unhandled Rejection at:', p, 'reason:', reason);
 });
