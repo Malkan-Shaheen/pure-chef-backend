@@ -25,12 +25,18 @@ if (process.env.MONGO_URI) {
     console.log("❌ FATAL ERROR: The MONGO_URI key is completely missing from .env!");
 }
 
-const corsOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, ''))
     : ['http://localhost:3000'];
 app.use(cors({
-    origin: corsOrigins,
-    credentials: true
+    origin: (origin, cb) => {
+        if (!origin) return cb(null, true);
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        if (origin.endsWith('.vercel.app')) return cb(null, true);
+        cb(null, false);
+    },
+    credentials: true,
+    optionsSuccessStatus: 200
 }));
 app.use(express.json());
 
