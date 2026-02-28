@@ -1,6 +1,40 @@
 const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+exports.detectIngredientsBase64 = async (req, res) => {
+    try {
+        const { imageBase64 } = req.body;
+        if (!imageBase64) {
+            return res.status(400).json({ error: "imageBase64 is required" });
+        }
+        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+
+        const prompt = `Look at this picture of a fridge or food items and identify ALL visible food ingredients.
+You MUST respond ONLY with a valid JSON object — no markdown, no backticks, no explanation.
+Use this EXACT structure:
+{"ingredients":["Chicken Breast","Eggs","Milk","Tomato","Lettuce","Cheese"]}
+Be specific with ingredient names. Only include food items.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{
+                role: 'user',
+                parts: [
+                    { text: prompt },
+                    { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } }
+                ]
+            }]
+        });
+
+        let cleanText = (response.text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const parsed = JSON.parse(cleanText);
+        res.status(200).json({ success: true, ingredients: parsed.ingredients || [] });
+    } catch (error) {
+        console.error("❌ [detect-ingredients-base64] Error:", error.message || error);
+        res.status(500).json({ error: "Failed to detect ingredients: " + (error.message || "Unknown error") });
+    }
+};
+
 exports.detectIngredients = async (req, res) => {
     try {
         console.log("🔍 [detect-ingredients] Request received...");
@@ -102,6 +136,56 @@ Return exactly 3 recipe objects with this EXACT structure:
         console.error("❌ [generate-recipes] Error:", error.message || error);
         res.status(500).json({ error: "Failed to generate recipes: " + (error.message || "Unknown error") });
     }
+};
+
+// Extended generate-recipes with mode, emotion, taste profile (frontend-compatible)
+exports.generateRecipesV2 = async (req, res) => {
+    try {
+        console.log("🍳 [generate-recipes-v2] Request received...");
+
+        const { ingredients = [], mode = "STANDARD", emotion = "COMFORT", tasteProfile = {} } = req.body;
+        const ingredientsList = Array.isArray(ingredients) ? ingredients.join(", ") : String(ingredients);
+
+        const prompt = `You are a chef assistant. Generate exactly 3 recipes as JSON array.
+Ingredients available: ${ingredientsList}.
+Mode: ${mode}. Emotion: ${emotion}.
+Taste memory: ${JSON.stringify(tasteProfile)}.
+
+Requirements:
+- clear title, description, prepTime (e.g. "20 mins"), calories (number)
+- include ingredients array with { name, amount, isMissing }
+- include instructions array
+- include nutrition_total and nutrition_per_serving with calories, protein_g, carbs_g, fat_g
+- include servings_count (number), nutrition_source ("estimated"), is_estimated (true)
+- mark at least one recipe with exactly one missing ingredient if possible.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { responseMimeType: 'application/json' }
+        });
+
+        let cleanText = (response.text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        let recipeArray = JSON.parse(cleanText);
+
+        if (!Array.isArray(recipeArray)) recipeArray = [recipeArray];
+        recipeArray = recipeArray.map((r, idx) => ({ ...r, id: `recipe-${idx}` }));
+
+        console.log(`✅ Generated ${recipeArray.length} recipes (v2)!`);
+        res.status(200).json({ success: true, recipes: recipeArray });
+    } catch (error) {
+        console.error("❌ [generate-recipes-v2] Error:", error.message || error);
+        res.status(500).json({ error: "Failed to generate recipes: " + (error.message || "Unknown error") });
+    }
+};
+
+exports.generateRecipeImage = async (req, res) => {
+    const { recipeTitle } = req.body || {};
+    const title = recipeTitle || "recipe";
+    res.status(200).json({
+        success: true,
+        imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`
+    });
 };
 
 exports.analyzeFridge = async (req, res) => {

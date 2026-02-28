@@ -12,7 +12,7 @@ const pantryRoutes = require('./routes/pantryRoutes');
 // SET UP
 // ──────────────────────────────────────────────────
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 // MongoDB
 console.log("🔍 Checking the safe for the MongoDB Key...");
@@ -25,7 +25,13 @@ if (process.env.MONGO_URI) {
     console.log("❌ FATAL ERROR: The MONGO_URI key is completely missing from .env!");
 }
 
-app.use(cors());
+const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    : ['http://localhost:3000'];
+app.use(cors({
+    origin: corsOrigins,
+    credentials: true
+}));
 app.use(express.json());
 
 // Mount the routes to the Express app
