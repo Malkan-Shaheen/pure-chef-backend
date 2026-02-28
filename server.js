@@ -40,11 +40,20 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Health check (no DB required)
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
+});
+
 // Mount the routes to the Express app
 app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/pantry', pantryRoutes);
+
+if (!process.env.JWT_SECRET) {
+    console.error("❌ FATAL: JWT_SECRET is missing! Set it in Railway env vars.");
+}
 
 // ─────────────────────────────────────────────────────────────
 // START SERVER
