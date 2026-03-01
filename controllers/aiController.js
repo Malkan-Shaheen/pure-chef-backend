@@ -38,8 +38,8 @@ async function generateRecipeImage(recipeTitle, req) {
                 const filepath = path.join(imagesDir, filename);
                 fs.writeFileSync(filepath, Buffer.from(part.inlineData.data, 'base64'));
 
-                // Build public URL using the request host
-                const protocol = req.protocol || 'http';
+                // Build public URL — detect Railway (behind proxy) vs localhost
+                const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
                 const host = req.get('host') || 'localhost:3000';
                 const imageUrl = `${protocol}://${host}/images/${filename}`;
 
@@ -55,11 +55,22 @@ async function generateRecipeImage(recipeTitle, req) {
     }
 }
 
-// ── Helper: attach generated images to all recipes in parallel ──
+// ── Helper: wrap image generation with a timeout ──
+function generateImageWithTimeout(recipeTitle, req, timeoutMs = 25000) {
+    return Promise.race([
+        generateRecipeImage(recipeTitle, req),
+        new Promise((resolve) => setTimeout(() => {
+            console.log(`⏰ Image generation timed out for "${recipeTitle}" after ${timeoutMs}ms`);
+            resolve(null);
+        }, timeoutMs))
+    ]);
+}
+
+// ── Helper: attach generated images to all recipes in parallel (with timeout) ──
 async function attachImagesToRecipes(recipes, req) {
     const withImages = await Promise.all(
         recipes.map(async (recipe) => {
-            const imageUrl = await generateRecipeImage(recipe.title, req);
+            const imageUrl = await generateImageWithTimeout(recipe.title, req);
             recipe.imageUrl = imageUrl;
             return recipe;
         })
