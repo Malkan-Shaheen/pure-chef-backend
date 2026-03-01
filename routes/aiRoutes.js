@@ -11,4 +11,9 @@ router.post('/detect-ingredients', authMiddleware, upload.single('fridgeImage'),
 router.post('/generate-recipes', authMiddleware, aiController.generateRecipes);
 router.post('/analyze-fridge', authMiddleware, upload.single('fridgeImage'), aiController.analyzeFridge);
 
+// v2 aliases — the Vercel web frontend calls these endpoints
+router.post('/detect-ingredients-v2', authMiddleware, upload.single('fridgeImage'), aiController.detectIngredients);
+router.post('/generate-recipes-v2', authMiddleware, aiController.generateRecipes);
+router.post('/analyze-fridge-v2', authMiddleware, upload.single('fridgeImage'), aiController.analyzeFridge);
+
 module.exports = router;
