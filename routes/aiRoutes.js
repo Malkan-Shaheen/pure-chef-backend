@@ -16,4 +16,7 @@ router.post('/detect-ingredients-v2', authMiddleware, upload.single('fridgeImage
 router.post('/generate-recipes-v2', authMiddleware, aiController.generateRecipes);
 router.post('/analyze-fridge-v2', authMiddleware, upload.single('fridgeImage'), aiController.analyzeFridge);
 
+// Single image generation (used by web frontend)
+router.post('/generate-recipe-image', authMiddleware, aiController.generateSingleImage);
+
 module.exports = router;

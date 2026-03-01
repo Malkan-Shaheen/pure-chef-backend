@@ -238,3 +238,45 @@ Return exactly 3 objects with this EXACT structure:
         res.status(500).json({ error: "Something went wrong: " + (error.message || "Unknown error") });
     }
 };
+
+// ── POST /api/ai/generate-recipe-image ──
+// The Vercel web frontend calls this to generate a single recipe image
+exports.generateSingleImage = async (req, res) => {
+    try {
+        const { title } = req.body;
+        if (!title) {
+            return res.status(400).json({ error: "Missing 'title' in request body" });
+        }
+
+        console.log(`🎨 [generate-recipe-image] Generating image for "${title}"...`);
+
+        const prompt = `A high-quality, professional, minimalist overhead food photograph of ${title}. Set on a clean kitchen counter with a soft minimalist blue background. Natural morning lighting, high resolution, aesthetic and appetizing presentation.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: {
+                imageConfig: {
+                    aspectRatio: "1:1"
+                }
+            }
+        });
+
+        const parts = response.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+            if (part.inlineData && part.inlineData.data) {
+                // Return as base64 data URI so the web frontend can display it directly
+                const dataUri = `data:image/png;base64,${part.inlineData.data}`;
+                console.log(`✅ [generate-recipe-image] Image generated for "${title}"`);
+                return res.status(200).json({ success: true, imageUrl: dataUri });
+            }
+        }
+
+        console.log(`⚠️ [generate-recipe-image] Gemini returned no image data for "${title}"`);
+        res.status(200).json({ success: true, imageUrl: null });
+
+    } catch (error) {
+        console.error("❌ [generate-recipe-image] Error:", error.message || error);
+        res.status(500).json({ error: "Image generation failed: " + (error.message || "Unknown error") });
+    }
+};
