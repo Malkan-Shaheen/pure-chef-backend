@@ -240,7 +240,8 @@ Return exactly 3 objects with this EXACT structure:
 };
 
 // ── POST /api/ai/generate-recipe-image ──
-// The Vercel web frontend calls this to generate a single recipe image
+// The Vercel web frontend calls this to generate a single recipe image.
+// Includes a 20s timeout so Railway never kills the connection.
 exports.generateSingleImage = async (req, res) => {
     try {
         const { title } = req.body;
@@ -250,33 +251,55 @@ exports.generateSingleImage = async (req, res) => {
 
         console.log(`🎨 [generate-recipe-image] Generating image for "${title}"...`);
 
-        const prompt = `A high-quality, professional, minimalist overhead food photograph of ${title}. Set on a clean kitchen counter with a soft minimalist blue background. Natural morning lighting, high resolution, aesthetic and appetizing presentation.`;
+        // Shorter, faster prompt
+        const prompt = `Minimalist overhead food photo of ${title}. Clean background, soft lighting, appetizing.`;
 
-        const response = await ai.models.generateContent({
+        // Race: Gemini image vs 20-second timeout
+        const imagePromise = ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-            config: {
-                imageConfig: {
-                    aspectRatio: "1:1"
-                }
-            }
+            config: { imageConfig: { aspectRatio: "1:1" } }
         });
 
+        const timeoutPromise = new Promise((resolve) =>
+            setTimeout(() => resolve(null), 20000)
+        );
+
+        const response = await Promise.race([imagePromise, timeoutPromise]);
+
+        // If timed out, return placeholder
+        if (!response) {
+            console.log(`⏰ [generate-recipe-image] Timed out for "${title}", sending placeholder`);
+            return res.status(200).json({
+                success: true,
+                imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`
+            });
+        }
+
+        // Extract image data
         const parts = response.candidates?.[0]?.content?.parts || [];
         for (const part of parts) {
             if (part.inlineData && part.inlineData.data) {
-                // Return as base64 data URI so the web frontend can display it directly
                 const dataUri = `data:image/png;base64,${part.inlineData.data}`;
                 console.log(`✅ [generate-recipe-image] Image generated for "${title}"`);
                 return res.status(200).json({ success: true, imageUrl: dataUri });
             }
         }
 
-        console.log(`⚠️ [generate-recipe-image] Gemini returned no image data for "${title}"`);
-        res.status(200).json({ success: true, imageUrl: null });
+        // Gemini returned no image → placeholder
+        console.log(`⚠️ [generate-recipe-image] No image data for "${title}", sending placeholder`);
+        res.status(200).json({
+            success: true,
+            imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`
+        });
 
     } catch (error) {
         console.error("❌ [generate-recipe-image] Error:", error.message || error);
-        res.status(500).json({ error: "Image generation failed: " + (error.message || "Unknown error") });
+        // Even on error, return a placeholder so the web app doesn't crash
+        res.status(200).json({
+            success: true,
+            imageUrl: `https://picsum.photos/seed/fallback/600/600`
+        });
     }
 };
+
