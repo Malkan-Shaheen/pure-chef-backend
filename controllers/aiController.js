@@ -55,22 +55,16 @@ async function generateRecipeImage(recipeTitle, req) {
     }
 }
 
-// ── Helper: generate images asynchronously in the background ──
-// We don't block the API response waiting for 3 huge image generations.
-function triggerBackgroundImages(recipes, req) {
-    console.log("🎨 Triggered background image generation for recipes...");
-    recipes.forEach(async (recipe) => {
-        try {
+// ── Helper: attach generated images to all recipes in parallel ──
+async function attachImagesToRecipes(recipes, req) {
+    const withImages = await Promise.all(
+        recipes.map(async (recipe) => {
             const imageUrl = await generateRecipeImage(recipe.title, req);
-            if (imageUrl) {
-                console.log(`✅ Background image completed for ${recipe.title}`);
-                // Note: The frontend will load these images later or they will be
-                // available when saved to MongoDB during the manual "Save to Recent" process.
-            }
-        } catch (e) {
-            console.error(`⚠️ Background image worker failed for ${recipe.title}`);
-        }
-    });
+            recipe.imageUrl = imageUrl;
+            return recipe;
+        })
+    );
+    return withImages;
 }
 
 exports.detectIngredients = async (req, res) => {
@@ -167,10 +161,11 @@ Return exactly 3 recipe objects with this EXACT structure:
         let cleanText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        // Trigger AI food images in the background (DO NOT AWAIT)
-        triggerBackgroundImages(recipeArray, req);
+        // Generate AI food images and save as static files
+        console.log("🎨 Generating food images with Gemini...");
+        recipeArray = await attachImagesToRecipes(recipeArray, req);
 
-        console.log(`✅ Generated ${recipeArray.length} text recipes instantly!`);
+        console.log(`✅ Generated ${recipeArray.length} recipes with AI images!`);
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {
@@ -231,10 +226,11 @@ Return exactly 3 objects with this EXACT structure:
         let cleanText = response.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        // Trigger AI food images in the background (DO NOT AWAIT)
-        triggerBackgroundImages(recipeArray, req);
+        // Generate AI food images and save as static files
+        console.log("🎨 Generating food images with Gemini...");
+        recipeArray = await attachImagesToRecipes(recipeArray, req);
 
-        console.log(`✅ Generated ${recipeArray.length} text recipes instantly from fridge!`);
+        console.log(`✅ Generated ${recipeArray.length} recipes from fridge with AI images!`);
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {
