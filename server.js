@@ -56,18 +56,6 @@ app.get('/api/health', (req, res) => {
     res.json({ ok: true, mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
 });
 
-// Debug endpoint to verify environment variables exist on Railway
-app.get('/api/debug', (req, res) => {
-    res.json({
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '✅ Set (' + process.env.GEMINI_API_KEY.substring(0, 8) + '...)' : '❌ MISSING',
-        MONGO_URI: process.env.MONGO_URI ? '✅ Set' : '❌ MISSING',
-        JWT_SECRET: process.env.JWT_SECRET ? '✅ Set' : '❌ MISSING',
-        CORS_ORIGIN: process.env.CORS_ORIGIN || '(not set, using default)',
-        NODE_ENV: process.env.NODE_ENV || '(not set)',
-        PORT: process.env.PORT || '3001 (default)',
-    });
-});
-
 // Mount the routes to the Express app
 app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
