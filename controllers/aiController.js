@@ -1,39 +1,71 @@
 const { GoogleGenAI } = require('@google/genai');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-exports.detectIngredientsBase64 = async (req, res) => {
-    try {
-        const { imageBase64 } = req.body;
-        if (!imageBase64) {
-            return res.status(400).json({ error: "imageBase64 is required" });
-        }
-        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+// Ensure the images directory exists
+const imagesDir = path.join(__dirname, '..', 'public', 'images');
+if (!fs.existsSync(imagesDir)) {
+    fs.mkdirSync(imagesDir, { recursive: true });
+    console.log('📁 Created public/images directory');
+}
 
-        const prompt = `Look at this picture of a fridge or food items and identify ALL visible food ingredients.
-You MUST respond ONLY with a valid JSON object — no markdown, no backticks, no explanation.
-Use this EXACT structure:
-{"ingredients":["Chicken Breast","Eggs","Milk","Tomato","Lettuce","Cheese"]}
-Be specific with ingredient names. Only include food items.`;
+// ── Helper: generate a food photo using Gemini and save as file ──
+async function generateRecipeImage(recipeTitle, req) {
+    try {
+        console.log(`🎨 Generating image for "${recipeTitle}"...`);
+
+        const prompt = `A high-quality, professional, minimalist overhead food photograph of ${recipeTitle}. Set on a clean kitchen counter with a soft minimalist blue background. Natural morning lighting, high resolution, aesthetic and appetizing presentation.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [{
-                role: 'user',
-                parts: [
-                    { text: prompt },
-                    { inlineData: { data: cleanBase64, mimeType: "image/jpeg" } }
-                ]
-            }]
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: {
+                imageConfig: {
+                    aspectRatio: "1:1"
+                }
+            }
         });
 
-        let cleanText = (response.text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        const parsed = JSON.parse(cleanText);
-        res.status(200).json({ success: true, ingredients: parsed.ingredients || [] });
+        // Extract image from response parts
+        const parts = response.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+            if (part.inlineData && part.inlineData.data) {
+                // Save to disk as PNG
+                const filename = `recipe-${crypto.randomUUID()}.png`;
+                const filepath = path.join(imagesDir, filename);
+                fs.writeFileSync(filepath, Buffer.from(part.inlineData.data, 'base64'));
+
+                // Build public URL using the request host
+                const protocol = req.protocol || 'http';
+                const host = req.get('host') || 'localhost:3000';
+                const imageUrl = `${protocol}://${host}/images/${filename}`;
+
+                console.log(`✅ Image saved: ${imageUrl}`);
+                return imageUrl;
+            }
+        }
+        console.log(`⚠️ Gemini returned no image data for "${recipeTitle}"`);
+        return null;
     } catch (error) {
-        console.error("❌ [detect-ingredients-base64] Error:", error.message || error);
-        res.status(500).json({ error: "Failed to detect ingredients: " + (error.message || "Unknown error") });
+        console.error(`⚠️ Image generation failed for "${recipeTitle}":`, error.message);
+        return null;
     }
-};
+}
+
+// ── Helper: attach generated images to all recipes in parallel ──
+async function attachImagesToRecipes(recipes, req) {
+    const withImages = await Promise.all(
+        recipes.map(async (recipe) => {
+            const imageUrl = await generateRecipeImage(recipe.title, req);
+            recipe.imageUrl = imageUrl;
+            return recipe;
+        })
+    );
+    return withImages;
+}
 
 exports.detectIngredients = async (req, res) => {
     try {
@@ -129,63 +161,17 @@ Return exactly 3 recipe objects with this EXACT structure:
         let cleanText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        console.log(`✅ Generated ${recipeArray.length} recipes!`);
+        // Generate AI food images and save as static files
+        console.log("🎨 Generating food images with Gemini...");
+        recipeArray = await attachImagesToRecipes(recipeArray, req);
+
+        console.log(`✅ Generated ${recipeArray.length} recipes with AI images!`);
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {
         console.error("❌ [generate-recipes] Error:", error.message || error);
         res.status(500).json({ error: "Failed to generate recipes: " + (error.message || "Unknown error") });
     }
-};
-
-// Extended generate-recipes with mode, emotion, taste profile (frontend-compatible)
-exports.generateRecipesV2 = async (req, res) => {
-    try {
-        console.log("🍳 [generate-recipes-v2] Request received...");
-
-        const { ingredients = [], mode = "STANDARD", emotion = "COMFORT", tasteProfile = {} } = req.body;
-        const ingredientsList = Array.isArray(ingredients) ? ingredients.join(", ") : String(ingredients);
-
-        const prompt = `You are a chef assistant. Generate exactly 3 recipes as JSON array.
-Ingredients available: ${ingredientsList}.
-Mode: ${mode}. Emotion: ${emotion}.
-Taste memory: ${JSON.stringify(tasteProfile)}.
-
-Requirements:
-- clear title, description, prepTime (e.g. "20 mins"), calories (number)
-- include ingredients array with { name, amount, isMissing }
-- include instructions array
-- include nutrition_total and nutrition_per_serving with calories, protein_g, carbs_g, fat_g
-- include servings_count (number), nutrition_source ("estimated"), is_estimated (true)
-- mark at least one recipe with exactly one missing ingredient if possible.`;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { responseMimeType: 'application/json' }
-        });
-
-        let cleanText = (response.text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-        let recipeArray = JSON.parse(cleanText);
-
-        if (!Array.isArray(recipeArray)) recipeArray = [recipeArray];
-        recipeArray = recipeArray.map((r, idx) => ({ ...r, id: `recipe-${idx}` }));
-
-        console.log(`✅ Generated ${recipeArray.length} recipes (v2)!`);
-        res.status(200).json({ success: true, recipes: recipeArray });
-    } catch (error) {
-        console.error("❌ [generate-recipes-v2] Error:", error.message || error);
-        res.status(500).json({ error: "Failed to generate recipes: " + (error.message || "Unknown error") });
-    }
-};
-
-exports.generateRecipeImage = async (req, res) => {
-    const { recipeTitle } = req.body || {};
-    const title = recipeTitle || "recipe";
-    res.status(200).json({
-        success: true,
-        imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`
-    });
 };
 
 exports.analyzeFridge = async (req, res) => {
@@ -240,7 +226,11 @@ Return exactly 3 objects with this EXACT structure:
         let cleanText = response.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        console.log(`✅ Generated ${recipeArray.length} recipes from fridge image!`);
+        // Generate AI food images and save as static files
+        console.log("🎨 Generating food images with Gemini...");
+        recipeArray = await attachImagesToRecipes(recipeArray, req);
+
+        console.log(`✅ Generated ${recipeArray.length} recipes from fridge with AI images!`);
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {

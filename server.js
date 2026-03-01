@@ -1,12 +1,18 @@
 require('dotenv').config();
+const dns = require('dns');
+// Fix for Node.js 17+ randomly failing to connect to MongoDB Atlas because of IPv6 DNS preference issues locally
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
 const pantryRoutes = require('./routes/pantryRoutes');
+const recentRecipeRoutes = require('./routes/recentRecipeRoutes');
 
 // ──────────────────────────────────────────────────
 // SET UP
@@ -38,7 +44,12 @@ app.use(cors({
     credentials: true,
     optionsSuccessStatus: 200
 }));
-app.use(express.json());
+// Increase JSON payload limit for Base64 Profile Images
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Serve generated recipe images as static files
+app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
 // Health check (no DB required)
 app.get('/api/health', (req, res) => {
@@ -50,6 +61,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/pantry', pantryRoutes);
+app.use('/api/recent-recipes', recentRecipeRoutes);
 
 if (!process.env.JWT_SECRET) {
     console.error("❌ FATAL: JWT_SECRET is missing! Set it in Railway env vars.");
@@ -68,6 +80,17 @@ process.on('SIGTERM', () => {
     server.close(() => {
         mongoose.connection.close(false, () => {
             console.log('Closed.');
+            process.exit(0);
+        });
+    });
+});
+
+// Graceful shutdown on Ctrl+C (SIGINT)
+process.on('SIGINT', () => {
+    console.log('SIGINT (Ctrl+C) received, shutting down gracefully...');
+    server.close(() => {
+        mongoose.connection.close(false, () => {
+            console.log('MongoDB connection closed.');
             process.exit(0);
         });
     });

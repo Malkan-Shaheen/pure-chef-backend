@@ -70,3 +70,62 @@ exports.login = async (req, res) => {
         res.status(500).json({ error: "Failed to log in." });
     }
 };
+
+exports.getProfile = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const user = await User.findById(userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                profileImage: user.profileImage
+            }
+        });
+    } catch (error) {
+        console.error("❌ [getProfile] Error:", error.message || error);
+        res.status(500).json({ error: "Failed to fetch profile." });
+    }
+};
+
+exports.updateProfile = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { name, profileImage } = req.body;
+
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (profileImage !== undefined) updateData.profileImage = profileImage;
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Profile updated successfully!",
+            user: {
+                id: updatedUser._id,
+                email: updatedUser.email,
+                name: updatedUser.name,
+                profileImage: updatedUser.profileImage
+            }
+        });
+    } catch (error) {
+        console.error("❌ [updateProfile] Error:", error.message || error);
+        res.status(500).json({ error: "Failed to update profile." });
+    }
+};
