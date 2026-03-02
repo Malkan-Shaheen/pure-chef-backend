@@ -52,7 +52,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve generated recipe images as static files
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 
-// Health check (no DB required)
+// Root + health (Railway and other platforms often ping /)
+app.get('/', (req, res) => res.json({ status: 'ok', service: 'purechef-api' }));
 app.get('/api/health', (req, res) => {
     res.json({ ok: true, mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
 });
