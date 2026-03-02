@@ -175,11 +175,18 @@ Return exactly 3 recipe objects with this EXACT structure:
         let cleanText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        // Generate AI food images and save as static files
-        console.log("🎨 Generating food images with Gemini...");
-        recipeArray = await attachImagesToRecipes(recipeArray, req);
-
-        console.log(`✅ Generated ${recipeArray.length} recipes with AI images!`);
+        // Generate AI images unless skipImages=true (faster response)
+        if (req.body?.skipImages) {
+            recipeArray = recipeArray.map(r => ({
+                ...r,
+                imageUrl: `https://picsum.photos/seed/${encodeURIComponent(r.title || 'recipe')}/600/600`
+            }));
+            console.log(`✅ Generated ${recipeArray.length} recipes (placeholders)`);
+        } else {
+            console.log("🎨 Generating food images with Gemini...");
+            recipeArray = await attachImagesToRecipes(recipeArray, req);
+            console.log(`✅ Generated ${recipeArray.length} recipes with AI images!`);
+        }
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {
