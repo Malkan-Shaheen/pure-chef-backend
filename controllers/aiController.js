@@ -172,6 +172,9 @@ Return exactly 3 recipe objects with this EXACT structure:
         });
 
         const rawText = response.text;
+        let cleanText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const recipeArray = JSON.parse(cleanText);
+
         // Generate AI food images and save as static files (Removed to prevent timeouts, done client-side now)
         // console.log("🎨 Generating food images with Gemini...");
         // recipeArray = await attachImagesToRecipes(recipeArray, req);
@@ -233,6 +236,9 @@ Return exactly 3 objects with this EXACT structure:
                 ]
             }]
         });
+
+        const cleanText = response.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const recipeArray = JSON.parse(cleanText);
 
         // Generate AI food images and save as static files (Removed to prevent timeouts, done client-side now)
         // console.log("🎨 Generating food images with Gemini...");
