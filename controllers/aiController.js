@@ -175,12 +175,11 @@ Return exactly 3 recipe objects with this EXACT structure:
         let cleanText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        // Always use placeholders for fast response (~5 sec). AI images disabled for speed.
-        recipeArray = recipeArray.map(r => ({
-            ...r,
-            imageUrl: `https://picsum.photos/seed/${encodeURIComponent(r.title || 'recipe')}/600/600`
-        }));
-        console.log(`✅ Generated ${recipeArray.length} recipes (fast mode)`);
+        // Generate AI food images and save as static files (Removed to prevent timeouts, done client-side now)
+        // console.log("🎨 Generating food images with Gemini...");
+        // recipeArray = await attachImagesToRecipes(recipeArray, req);
+
+        console.log(`✅ Generated ${recipeArray.length} recipes immediately!`);
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {
@@ -241,11 +240,11 @@ Return exactly 3 objects with this EXACT structure:
         let cleanText = response.text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         let recipeArray = JSON.parse(cleanText);
 
-        // Generate AI food images and save as static files
-        console.log("🎨 Generating food images with Gemini...");
-        recipeArray = await attachImagesToRecipes(recipeArray, req);
+        // Generate AI food images and save as static files (Removed to prevent timeouts, done client-side now)
+        // console.log("🎨 Generating food images with Gemini...");
+        // recipeArray = await attachImagesToRecipes(recipeArray, req);
 
-        console.log(`✅ Generated ${recipeArray.length} recipes from fridge with AI images!`);
+        console.log(`✅ Generated ${recipeArray.length} recipes from fridge immediately!`);
         res.status(200).json({ success: true, recipes: recipeArray });
 
     } catch (error) {
