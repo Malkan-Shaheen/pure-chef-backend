@@ -129,8 +129,11 @@ exports.generateRecipes = async (req, res) => {
     try {
         console.log("🍳 [generate-recipes] Request received...");
 
-        const userMood = req.body.mood || "hungry";
-        const ingredientsList = req.body.ingredients || "none";
+        const userMood = req.body.mood || req.body.emotion || "hungry";
+        let ingredientsList = req.body.ingredients || "none";
+        if (Array.isArray(ingredientsList)) {
+            ingredientsList = ingredientsList.join(", ");
+        }
 
         console.log(`📋 Mood: ${userMood}`);
         console.log(`🥕 Ingredients: ${ingredientsList}`);
@@ -255,15 +258,16 @@ Return exactly 3 objects with this EXACT structure:
 // Includes a 20s timeout so Railway never kills the connection.
 exports.generateSingleImage = async (req, res) => {
     try {
-        const { title } = req.body;
-        if (!title) {
-            return res.status(400).json({ error: "Missing 'title' in request body" });
+        const { title, recipeTitle } = req.body || {};
+        const recipeName = (title || recipeTitle || "").trim();
+        if (!recipeName) {
+            return res.status(400).json({ error: "Missing 'title' or 'recipeTitle' in request body" });
         }
 
-        console.log(`🎨 [generate-recipe-image] Generating image for "${title}"...`);
+        console.log(`🎨 [generate-recipe-image] Generating image for "${recipeName}"...`);
 
         // Shorter, faster prompt
-        const prompt = `Minimalist overhead food photo of ${title}. Clean background, soft lighting, appetizing.`;
+        const prompt = `Minimalist overhead food photo of ${recipeName}. Clean background, soft lighting, appetizing.`;
 
         // Race: Gemini image vs 20-second timeout
         const imagePromise = ai.models.generateContent({
@@ -280,10 +284,10 @@ exports.generateSingleImage = async (req, res) => {
 
         // If timed out, return placeholder
         if (!response) {
-            console.log(`⏰ [generate-recipe-image] Timed out for "${title}", sending placeholder`);
+            console.log(`⏰ [generate-recipe-image] Timed out for "${recipeName}", sending placeholder`);
             return res.status(200).json({
                 success: true,
-                imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`
+                imageUrl: `https://picsum.photos/seed/${encodeURIComponent(recipeName)}/600/600`
             });
         }
 
@@ -292,16 +296,16 @@ exports.generateSingleImage = async (req, res) => {
         for (const part of parts) {
             if (part.inlineData && part.inlineData.data) {
                 const dataUri = `data:image/png;base64,${part.inlineData.data}`;
-                console.log(`✅ [generate-recipe-image] Image generated for "${title}"`);
+                console.log(`✅ [generate-recipe-image] Image generated for "${recipeName}"`);
                 return res.status(200).json({ success: true, imageUrl: dataUri });
             }
         }
 
         // Gemini returned no image → placeholder
-        console.log(`⚠️ [generate-recipe-image] No image data for "${title}", sending placeholder`);
+        console.log(`⚠️ [generate-recipe-image] No image data for "${recipeName}", sending placeholder`);
         res.status(200).json({
             success: true,
-            imageUrl: `https://picsum.photos/seed/${encodeURIComponent(title)}/600/600`
+            imageUrl: `https://picsum.photos/seed/${encodeURIComponent(recipeName)}/600/600`
         });
 
     } catch (error) {
