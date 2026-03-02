@@ -19,7 +19,7 @@ async function generateRecipeImage(recipeTitle, req) {
 
         const prompt = `A high-quality, professional, minimalist overhead food photograph of ${recipeTitle}. Set on a clean kitchen counter with a soft minimalist blue background. Natural morning lighting, high resolution, aesthetic and appetizing presentation.`;
 
-        const response = await ai.models.generateContent({
+        const imagePromise = ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: {
@@ -28,6 +28,17 @@ async function generateRecipeImage(recipeTitle, req) {
                 }
             }
         });
+
+        const timeoutPromise = new Promise((resolve) =>
+            setTimeout(() => resolve(null), 15000)
+        );
+
+        const response = await Promise.race([imagePromise, timeoutPromise]);
+
+        if (!response) {
+            console.log(`⏰ [generateRecipeImage] Timed out for "${recipeTitle}", sending placeholder`);
+            return `https://picsum.photos/seed/${encodeURIComponent(recipeTitle)}/600/600`;
+        }
 
         // Extract image from response parts
         const parts = response.candidates?.[0]?.content?.parts || [];

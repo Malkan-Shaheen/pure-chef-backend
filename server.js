@@ -18,6 +18,7 @@ const recentRecipeRoutes = require('./routes/recentRecipeRoutes');
 // SET UP
 // ──────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3001;
 
 // MongoDB
