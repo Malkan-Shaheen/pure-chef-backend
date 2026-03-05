@@ -47,7 +47,6 @@ app.use(cors({
     credentials: true,
     optionsSuccessStatus: 200
 }));
-
 // Stripe webhook — must be BEFORE express.json() so the raw body is preserved
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeController.handleWebhook);
 
