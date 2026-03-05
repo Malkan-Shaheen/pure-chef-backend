@@ -19,7 +19,7 @@ async function generateRecipeImage(recipeTitle, req) {
 
         // Note: For image generation, Gemini 1.5 doesn't currently support direct image output in this exact way in all regions,
         // but we'll adapt to the standard model.generateContent flow.
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `A high-quality, professional, minimalist overhead food photograph of ${recipeTitle}. Set on a clean kitchen counter with a soft minimalist blue background. Natural morning lighting, high resolution, aesthetic and appetizing presentation.`;
 
         const result = await model.generateContent(prompt);
@@ -71,7 +71,7 @@ exports.detectIngredients = async (req, res) => {
             return res.status(400).json({ error: "No fridge picture uploaded!" });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const imageBase64 = req.file.buffer.toString("base64");
 
         const prompt = `Look at this picture of a fridge or food items and identify ALL visible food ingredients.
@@ -102,7 +102,7 @@ exports.generateRecipes = async (req, res) => {
     try {
         console.log("🍳 [generate-recipes] Request received...");
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const { mood, ingredients } = req.body;
         let ingredientsList = ingredients || "none";
         if (Array.isArray(ingredientsList)) {
@@ -139,7 +139,7 @@ exports.analyzeFridge = async (req, res) => {
             return res.status(400).json({ error: "No fridge picture uploaded!" });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const { mood, ingredients } = req.body;
         const imageBase64 = req.file.buffer.toString("base64");
 
@@ -171,7 +171,7 @@ exports.generateSingleImage = async (req, res) => {
         const recipeName = (title || recipeTitle || "").trim();
         if (!recipeName) return res.status(400).json({ error: "Missing title" });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `Minimalist overhead food photo of ${recipeName}.`;
 
         const result = await model.generateContent(prompt);
