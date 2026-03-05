@@ -13,6 +13,8 @@ const aiRoutes = require('./routes/aiRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
 const pantryRoutes = require('./routes/pantryRoutes');
 const recentRecipeRoutes = require('./routes/recentRecipeRoutes');
+const stripeRoutes = require('./routes/stripeRoutes');
+const stripeController = require('./controllers/stripeController');
 
 // ──────────────────────────────────────────────────
 // SET UP
@@ -45,6 +47,10 @@ app.use(cors({
     credentials: true,
     optionsSuccessStatus: 200
 }));
+
+// Stripe webhook — must be BEFORE express.json() so the raw body is preserved
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeController.handleWebhook);
+
 // Increase JSON payload limit for Base64 Profile Images
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -64,6 +70,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/pantry', pantryRoutes);
 app.use('/api/recent-recipes', recentRecipeRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 if (!process.env.JWT_SECRET) {
     console.error("❌ FATAL: JWT_SECRET is missing! Set it in Railway env vars.");

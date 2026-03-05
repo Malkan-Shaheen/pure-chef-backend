@@ -86,7 +86,8 @@ exports.getProfile = async (req, res) => {
                 id: user._id,
                 email: user.email,
                 name: user.name,
-                profileImage: user.profileImage
+                profileImage: user.profileImage,
+                isPro: user.isPro ?? false,
             }
         });
     } catch (error) {
