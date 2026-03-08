@@ -7,7 +7,11 @@ const authMiddleware = require('../middleware/authMiddleware');
 // Setup memory storage for image parsing (needed for fridge photos)
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Multipart upload (mobile / web camera)
 router.post('/detect-ingredients', authMiddleware, upload.single('fridgeImage'), aiController.detectIngredients);
+// Base64 API used by web app
+router.post('/detect-ingredients-base64', authMiddleware, aiController.detectIngredientsBase64);
+
 router.post('/generate-recipes', authMiddleware, aiController.generateRecipes);
 router.post('/analyze-fridge', authMiddleware, upload.single('fridgeImage'), aiController.analyzeFridge);
 

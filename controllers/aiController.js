@@ -20,7 +20,7 @@ async function generateRecipeImage(recipeTitle, req) {
         const prompt = `A high-quality, professional, minimalist overhead food photograph of ${recipeTitle}. Set on a clean kitchen counter with a soft minimalist blue background. Natural morning lighting, high resolution, aesthetic and appetizing presentation.`;
 
         const imagePromise = ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-1.5-flash',
             contents: { parts: [{ text: prompt }] },
             config: {
                 imageConfig: {
@@ -100,7 +100,7 @@ Be specific with ingredient names (e.g. "Cherry Tomatoes" not "vegetables").
 Only include food items, not containers or non-food objects.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: [{
                 role: 'user',
                 parts: [
@@ -148,7 +148,7 @@ Be specific with ingredient names (e.g. "Cherry Tomatoes" not "vegetables").
 Only include food items, not containers or non-food objects.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: [{
                 role: 'user',
                 parts: [
@@ -216,7 +216,7 @@ Return exactly 3 recipe objects with this EXACT structure, including ALL macros 
 ]`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: [{ role: 'user', parts: [{ text: prompt }] }]
         });
 
@@ -276,7 +276,7 @@ Return exactly 3 objects with this EXACT structure:
 ]`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: [{
                 role: 'user',
                 parts: [
@@ -320,7 +320,7 @@ exports.generateSingleImage = async (req, res) => {
 
         // Race: Gemini image vs 20-second timeout
         const imagePromise = ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-1.5-flash',
             contents: { parts: [{ text: prompt }] },
             config: { imageConfig: { aspectRatio: "1:1" } }
         });

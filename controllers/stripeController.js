@@ -3,12 +3,17 @@ const User = require('../models/User');
 
 exports.createPaymentIntent = async (req, res) => {
     try {
-        const { amount } = req.body;
+        const { planType } = req.body;
         const userId = req.user?.userId;
 
-        // Ensure amount is provided
-        if (!amount) {
-            return res.status(400).json({ success: false, message: 'Amount is required' });
+        // Ensure planType is provided and determine amount
+        let amount;
+        if (planType === 'yearly') {
+            amount = 5900;
+        } else if (planType === 'monthly') {
+            amount = 799;
+        } else {
+            return res.status(400).json({ success: false, message: 'Valid planType (yearly, monthly) is required' });
         }
 
         // Build PaymentIntent params
@@ -37,35 +42,7 @@ exports.createPaymentIntent = async (req, res) => {
     }
 };
 
-exports.upgradeStatus = async (req, res) => {
-    try {
-        const userId = req.user.userId;
 
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            { isPro: true },
-            { new: true }
-        );
-
-        if (!updatedUser) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-        res.json({
-            success: true,
-            message: 'User successfully upgraded to Pro!',
-            user: {
-                id: updatedUser._id,
-                email: updatedUser.email,
-                name: updatedUser.name,
-                isPro: updatedUser.isPro
-            }
-        });
-    } catch (error) {
-        console.error('Error upgrading user status:', error);
-        res.status(500).json({ success: false, message: 'Failed to upgrade user status' });
-    }
-};
 
 // ──────────────────────────────────────────────────────
 // STRIPE WEBHOOK — safety-net for payment verification
