@@ -5,7 +5,8 @@ module.exports = (req, res, next) => {
     if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const secret = process.env.JWT_SECRET || 'pure-chef-backend-jwt-token-new-string';
+        const decoded = jwt.verify(token, secret);
         req.user = decoded; // { userId: '...' }
         next();
     } catch (error) {

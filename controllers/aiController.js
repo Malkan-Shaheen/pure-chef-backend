@@ -1,7 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -12,8 +11,8 @@ if (!fs.existsSync(imagesDir)) {
     console.log('📁 Created public/images directory');
 }
 
-// ── Helper: generate a food photo using Gemini and save as file ──
-async function generateRecipeImage(recipeTitle, req) {
+// ── Helper: generate a food photo using Gemini and return as base64 data URI ──
+async function generateRecipeImage(recipeTitle) {
     try {
         console.log(`🎨 Generating image for "${recipeTitle}"...`);
 
@@ -22,11 +21,7 @@ async function generateRecipeImage(recipeTitle, req) {
         const imagePromise = ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-            config: {
-                imageConfig: {
-                    aspectRatio: "1:1"
-                }
-            }
+            config: { imageConfig: { aspectRatio: "1:1" } }
         });
 
         const timeoutPromise = new Promise((resolve) =>
@@ -40,37 +35,29 @@ async function generateRecipeImage(recipeTitle, req) {
             return `https://picsum.photos/seed/${encodeURIComponent(recipeTitle)}/600/600`;
         }
 
-        // Extract image from response parts
+        // Extract image from response and return as base64 data URI (works on all devices)
         const parts = response.candidates?.[0]?.content?.parts || [];
         for (const part of parts) {
             if (part.inlineData && part.inlineData.data) {
-                // Save to disk as PNG
-                const filename = `recipe-${crypto.randomUUID()}.png`;
-                const filepath = path.join(imagesDir, filename);
-                fs.writeFileSync(filepath, Buffer.from(part.inlineData.data, 'base64'));
-
-                // Build public URL using the request host
-                const protocol = req.protocol || 'http';
-                const host = req.get('host') || 'localhost:3000';
-                const imageUrl = `${protocol}://${host}/images/${filename}`;
-
-                console.log(`✅ Image saved: ${imageUrl}`);
-                return imageUrl;
+                const dataUri = `data:image/png;base64,${part.inlineData.data}`;
+                console.log(`✅ Image generated as base64 for "${recipeTitle}"`);
+                return dataUri;
             }
         }
-        console.log(`⚠️ Gemini returned no image data for "${recipeTitle}"`);
-        return null;
+
+        console.log(`⚠️ Gemini returned no image data for "${recipeTitle}", using placeholder`);
+        return `https://picsum.photos/seed/${encodeURIComponent(recipeTitle)}/600/600`;
     } catch (error) {
         console.error(`⚠️ Image generation failed for "${recipeTitle}":`, error.message);
-        return null;
+        return `https://picsum.photos/seed/${encodeURIComponent(recipeTitle)}/600/600`;
     }
 }
 
 // ── Helper: attach generated images to all recipes in parallel ──
-async function attachImagesToRecipes(recipes, req) {
+async function attachImagesToRecipes(recipes) {
     const withImages = await Promise.all(
         recipes.map(async (recipe) => {
-            const imageUrl = await generateRecipeImage(recipe.title, req);
+            const imageUrl = await generateRecipeImage(recipe.title);
             recipe.imageUrl = imageUrl;
             return recipe;
         })
@@ -226,7 +213,7 @@ Return exactly 3 recipe objects with this EXACT structure, including ALL macros 
 
         // Generate AI food images and save as static files (Removed to prevent timeouts, done client-side now)
         console.log("🎨 Generating food images with Gemini...");
-        recipeArray = await attachImagesToRecipes(recipeArray, req);
+        recipeArray = await attachImagesToRecipes(recipeArray);
 
         console.log(`✅ Generated ${recipeArray.length} recipes immediately!`);
         res.status(200).json({ success: true, recipes: recipeArray });
@@ -291,7 +278,7 @@ Return exactly 3 objects with this EXACT structure:
 
         // Generate AI food images and save as static files (Removed to prevent timeouts, done client-side now)
         console.log("🎨 Generating food images with Gemini...");
-        recipeArray = await attachImagesToRecipes(recipeArray, req);
+        recipeArray = await attachImagesToRecipes(recipeArray);
 
         console.log(`✅ Generated ${recipeArray.length} recipes from fridge immediately!`);
         res.status(200).json({ success: true, recipes: recipeArray });

@@ -11,10 +11,8 @@ exports.signup = async (req, res) => {
         if (password.length < 6) {
             return res.status(400).json({ error: "Password must be at least 6 characters." });
         }
-        if (!process.env.JWT_SECRET) {
-            console.error("❌ JWT_SECRET not set");
-            return res.status(500).json({ error: "Server misconfiguration. Please try again later." });
-        }
+        
+        const secret = process.env.JWT_SECRET || 'pure-chef-backend-jwt-token-new-string';
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -25,7 +23,7 @@ exports.signup = async (req, res) => {
         const user = new User({ email, password: hashedPassword });
         await user.save();
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '7d' });
         res.status(201).json({ success: true, message: "User created successfully!", token });
     } catch (error) {
         console.error("❌ [signup] Error:", error.message || error);
@@ -45,10 +43,8 @@ exports.login = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ error: "Email and password are required." });
         }
-        if (!process.env.JWT_SECRET) {
-            console.error("❌ JWT_SECRET not set");
-            return res.status(500).json({ error: "Server misconfiguration. Please try again later." });
-        }
+
+        const secret = process.env.JWT_SECRET || 'pure-chef-backend-jwt-token-new-string';
 
         const user = await User.findOne({ email });
         if (!user) {
@@ -60,7 +56,7 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '7d' });
         res.status(200).json({ success: true, message: "Login successful!", token });
     } catch (error) {
         console.error("❌ [login] Error:", error.message || error);
@@ -80,6 +76,44 @@ exports.getProfile = async (req, res) => {
             return res.status(404).json({ error: "User not found." });
         }
 
+        // --- DAILY LIMIT RESET CHECK ---
+        const now = new Date();
+        const lastGen = user.lastGenerationDate;
+        let needsSave = false;
+
+        if (lastGen) {
+            const isSameDay = now.getFullYear() === lastGen.getFullYear() &&
+                              now.getMonth() === lastGen.getMonth() &&
+                              now.getDate() === lastGen.getDate();
+            if (!isSameDay && user.generationsToday > 0) {
+                user.generationsToday = 0;
+                needsSave = true;
+            }
+        }
+
+        // --- LOCALHOST WEBHOOK BYPASS & SYNC ---
+        // If webhooks aren't hitting localhost, safely ask Stripe directly on app launch
+        if (user.stripeSubscriptionId) {
+            try {
+                const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'fake');
+                const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+                
+                const shouldBePro = (sub.status === 'trialing' || sub.status === 'active');
+                if (user.subscriptionStatus !== sub.status || user.isPro !== shouldBePro) {
+                    user.subscriptionStatus = sub.status;
+                    user.isPro = shouldBePro;
+                    needsSave = true;
+                }
+            } catch (err) {
+                console.error("Local sync error:", err.message);
+            }
+        }
+        
+        if (needsSave) {
+            await user.save();
+        }
+        // ----------------------------------------
+
         res.status(200).json({
             success: true,
             user: {
@@ -88,6 +122,8 @@ exports.getProfile = async (req, res) => {
                 name: user.name,
                 profileImage: user.profileImage,
                 isPro: user.isPro ?? false,
+                generationsToday: user.generationsToday ?? 0,
+                lifetimeGenerations: user.lifetimeGenerations ?? 0
             }
         });
     } catch (error) {
