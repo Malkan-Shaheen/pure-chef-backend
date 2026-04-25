@@ -24,7 +24,7 @@ exports.signup = async (req, res) => {
         const user = new User({ email, password: hashedPassword });
         await user.save();
 
-        const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '365d' });
         res.status(201).json({ success: true, message: "User created successfully!", token });
     } catch (error) {
         console.error("❌ [signup] Error:", error.message || error);
@@ -57,7 +57,7 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: "Invalid email or password." });
         }
 
-        const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '7d' });
+        const token = jwt.sign({ userId: user._id }, secret, { expiresIn: '365d' });
         res.status(200).json({ success: true, message: "Login successful!", token });
     } catch (error) {
         console.error("❌ [login] Error:", error.message || error);
