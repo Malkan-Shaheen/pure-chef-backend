@@ -14,7 +14,9 @@ const userSchema = new mongoose.Schema({
     generationsToday: { type: Number, default: 0 },
     lastGenerationDate: { type: Date, default: null },
     lifetimeGenerations: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    otpCode: { type: String, default: null },
+    otpExpiry: { type: Date, default: null }
 });
 
 module.exports = mongoose.model('User', userSchema);
